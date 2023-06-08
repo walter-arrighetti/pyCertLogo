@@ -1,8 +1,10 @@
 #!/usr/bin/python
 ##########################################################
-#  x509certLogos  0.1                                           #
-#                                                                   #
-#    conforms with:                                             #
+#  x509certLogos  0.1                                    #
+#                                                        #
+#    conforms with:                                      #
+#         RFC-3709: Logotypes in X.509 Certificates      #
+#         RFC-6170: Cerificate Image                     #
 #                                                        #
 #    Copyright (C) 2023 Walter Arrighetti, Ph.D.         #
 #    All Rights Reserved.                                #
