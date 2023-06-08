@@ -23,46 +23,6 @@ import os
 import io
 import re
 
-X = [f for x in y]
-
-[leaf_logotypeExtn]
-#	communityLogos			= EXPLICIT:0,SEQUENCE:communityLogos
-	issuerLogo				= EXPLICIT:1,IMPLICIT:0,SEQUENCE:subCA_LogotypeInfo
-	subjectLogo				= EXPLICIT:2,IMPLICIT:0,SEQUENCE:leaf_LogotypeInfo
-	otherLogos				= EXPLICIT:3,SEQUENCE:otherLogos
-[leaf_LogotypeInfo]
-	direct					= SEQUENCE:leaf_LogotypeData
-[leaf_LogotypeData]
-	image.1					= SEQUENCE:leaf_LogotypeImage.1
-	image.2					= SEQUENCE:leaf_LogotypeImage.2
-[leaf_LogotypeImage.1]
-	imageDetails			= SEQUENCE:leaf_LogotypeDetails.1
-[leaf_LogotypeImage.2]
-	imageDetails			= SEQUENCE:leaf_LogotypeDetails.2
-	
-
-	logotypeExtn = {
-		0 :	tuple([ communityLogo ]),
-		1 :	issuerLogo,
-		2 :	subjectLogo,
-		3 :	tuple([ otherLogo ])
-	}
-	logotypeInfo = {	'direct':tuple([	# logotypeInfo contains one 'direct' instance of logotypeDaa
-		imageOrAudio,
-	])	} 
-
-	logotypeDetails = {
-		'mediaType'		: mediaType,
-		'logotypeHash' 	: logotypeHash,
-		'logotypeURI'	: logotypeURI
-	}
-	logotypeURI = [
-		uri,
-	]
-	logotypeHash = [
-		(hashAlg, hashValue),
-	]
-
 class OID:
 	def __init__(self, oid0, oid1=None):
 		if oid0 and type(oid0)==type(""):	# Parse as a string x.y.z....
