@@ -3,20 +3,21 @@
 #  x509certLogos  0.2                                    #
 #                                                        #
 #    conforms with:                                      #
+#         RFC-9399: Logotypes in X.509 Certificates      #
+#    also conforms with obsoleted:                       #
 #         RFC-3709: Logotypes in X.509 Certificates      #
 #         RFC-6170: Cerificate Image                     #
 #                                                        #
 #    Copyright (C) 2023 Walter Arrighetti, Ph.D.         #
 #    All Rights Reserved.                                #
 ##########################################################
-VERSION = "0.2"
-## This version of the spec does NOT check:
-##   * if the SVG logo conforms with W3C's SVG Tiny 1.2 specs
-##   * if the PNG logo conforms with ISO-15948 specs
-##   * if the PDF logo conforms with PDF/A specs from ISO 32000
-##   * if the language tags for audio logos conforms with RFC-3066
-import hashlib
-import zipfile
+VERSION = "0.3"
+## This version of the tool does NOT yet check whether:
+##   * SVG/SVGZ logos conform with W3C's SVG Tiny 1.2 specs
+##   * PNG logos conform with ISO-15948 specs
+##   * PDF logos conform with PDF/A specs from ISO 32000-2
+##   * language tags for audio logos conform with RFC-5646
+#import zipfile
 import base64
 import os
 import io
@@ -26,13 +27,34 @@ import re
 def main():
 	import argparse
 	import sys
-	args = argparse.ArgumentParser(description="Takes one or several GIF/JPEG/PNG/SVG(Z) images and MP3 audio as input and returns a one-section OpenSSL configuration file to be used as a single X509v3 extension for a certificate to generate including those files as certificate logotypes/images, as per RFC-3709 and RFC-6170.")
+	print("x509certLogos %s - X.509 Certificate Logotypes embedder for OpenSSL scripts.\nCopyright (C) 2023 Walter Arrighetti, PhD, CISSP GCTI CCSP CEH\nAll Rights Reserved.\n\n"%VERSION)
+	parser = argparse.ArgumentParser(description="Takes one or several GIF/JPEG/PNG/SVG(Z) images and MP3 audio as input and returns a one-section OpenSSL configuration file to be used as a single X509v3 extension for a certificate to generate including those files as certificate logotypes/images, as per RFC-9399 (\"X.509 Certificate Logotypes\").", usage="The tool accepts one or more logotypes (in the form of filesystem-local pathnames or online URIs) and generates an OpenSSL-compatible configuration file containing sections that incorporate RFC-9399 logotype(s). The user has to manually reference the main section of generated text file as a custom x509v3 extension formatted as a custom \"ASN1:\" field.")
+	parser.add_argument('filename',type=argparse.FileType('a'),help="Pathname of the output OpenSSL-compatible configuration file (appended to it it is an already existing file) where the logotypes are present as extensions")
+	parser.add_argument('-c','--community',dest='community',action='append', nargs='*',help="Pathname or URI to add as a Community logotype (multiple communities allowed)")
+	parser.add_argument('-i','--issuer',dest='issuer',nargs='?',help="Pathname or URI to add as a logotype of the certificate Issuer")
+	parser.add_argument('-s','--subject',dest='subject',nargs='?',help="Pathname or URI to use as a logotype of the certificate Subject")
+	parser.add_argument('-O','--otherlogo',dest='other', action='append',nargs='*',help="Pathname or URI to use as additional logotype (multiple logos are allowed, but a '-o' must also be specified for each)")
+	parser.add_argument('-o','--oid',dest='oid',action='append',nargs='*',help="OID to use for each additional logotype, either as full arc (e.g. in the x.y.z.....w form) or one string among \"id-logo-[certImage|loyalty|background]\"")
+	args = parser.parse_args()
 	logotypeExt = x509LogotypeExtension()
-	#print(x509logotypeData("certs/logos/WA-logo_subCA_Systems-color.png",hashtype="sha256").struct(0))
-	if not logotypeExt.Issuer(x509logotypeData("certs/logos/WA-logo_subCA_Systems-color.png",hashtype="sha256")):
-		print("ERROR!!")
-	logotypeExt.exportConfig("logotype.cnf")
-	#args.add_argument()
+	if args.community:
+		if not logotypeExt.Community(list(map(x509logotypeData, [args.community[n][0] for n in range(len(args.community))] ))):			print(" [ERROR!]\tError parsing %d communtity logotype(s)."%len(args.community))
+		else:	print(" [  OK  ]\t%d Community logotype(s) present."%len(args.community))
+	if args.issuer:
+		if not logotypeExt.Issuer(x509logotypeData(args.issuer)):	print(" [ERROR!]\tError parsing Issuer logotype \"%s\"."%args.issuer)
+		else:	print(" [  OK  ]\tIssuer logotype present.")
+	if args.subject:
+		if not logotypeExt.Subject(x509logotypeData(args.subject)):		print(" [ERROR!]\tError parsing Subject logotype \"%s\"."%args.subject)
+		else:	print(" [  OK  ]\tSubject logotype present.")
+	if args.other and args.oid and len(args.other)==len(args.oid):
+		if not logotypeExt.Other([(args.oid[n][0],x509logotypeData(args.other[n][0])) for n in range(len(args.oid))]):	print(" [ERROR!]\tError parsing %d other-puropose logotype(s)."%len(atgs.other))
+		else:	print(" [  OK  ]\t%d other-purpose logotype(s) present."%len(args.other))
+	if not args.filename:
+		print(" [ERROR!]\tUnable to create or append OpenSSL configuration/template file to \"%s\"."%args.filename.name)
+	try:
+		logotypeExt.exportConfig(args.filename)
+		print(" [  OK  ]\tOpenSSL configuration/template file written/appended to \"%s\""%args.filename.name)
+	except:	print(" [ERROR!]\tUnable to create or append OpenSSL configuration/template file to \"%s\"."%args.filename.name)
 	
 
 
@@ -68,6 +90,12 @@ class OID:
 		else:	self.name = self.__repr__()
 	def __repr__(self):	return '.'.join(list(map(str,self.oid)))
 	def __str__(self):	return self.name
+	def __eq__(self, other):
+		if isinstance(other,OID):	return self.oid==other.oid
+		elif isOID(other):	return self.oid==OID(other).oid
+		elif type(other)==type(""):	return other.lower()==self.__str__().lower()
+		else:	return False
+	def __hash__(self):	return hash((self.oid,self.__repr__()))
 	def ___labelize(self,label):
 		def __islabel(s):
 			if not s:	return False
@@ -118,17 +146,20 @@ class OID:
 		if type(arc)==type(1):	return OID(self.list.append(arc), relabel=label)
 		elif type(arc)==type("") and arc.isdigit():	return OID(self.list.append(int(arc)), relabel=label)
 		else:	return None
-def isOID(bytes):	return bool(OID(bytes))
+def isOID(oid0, *OIDs, label=None):
+	try:	OID(oid0,*OIDs,label=label)
+	except:	return False
+	return True
 
 
 class x509LogotypeExtension:
 	def __init__(self):
 		id_logo = OID(1,3,6,1,5,5,7,20,label="id-logo")
-		self._otherLogoOIDs = frozenset([
-			OID(id_logo,1,label="id-logo-loyalty"),
-			OID(id_logo,2,label="id-logo-background"),
-			OID(id_logo,3,label="id-logo-certImage")
-		])
+		self._otherLogoOIDs = {
+			"id-logo-loyalty":OID(id_logo,1,label="id-logo-loyalty"),
+			"id-logo-background":OID(id_logo,2,label="id-logo-background"),
+			"id-logo-certImage":OID(id_logo,3,label="id-logo-certImage")
+		}
 		self.extn = {	'community':[], 'issuer':None,'subject':None,'other':[]	}
 	def Issuer(self, logo):
 		if not logo:	self.extn['issuer'] = None
@@ -140,24 +171,31 @@ class x509LogotypeExtension:
 		elif not isinstance(logo,x509logotypeData):	return False
 		self.extn['subject'] = logo
 		return True
-	def pushCommunity(self, logoarray):
-		if isinstance(logoarray,x509logotypeData):
-			self.extn['community'].append(logoarray)
-		elif not logoarray or type(logoarray) not in [type([]),type(tuple([]))]:	return False
-		for logo in logoarray:
-			if not isinstance(logo,x509logotypeData):	return False
-		for n in range(len(logoarray)):
-			self.extn['community'].append( logoarray[n] )
-		return True
-	def pushOther(self, logoarray):
+	def Community(self, logoarray):
 		if not logoarray or type(logoarray) not in [type([]),type(tuple([]))]:	return False
-		for item in logoarray:
-			if type(item) not in [type([]),type(tuple([]))] or len(item)!=2 or not isinstance(item[1],x509logotypeData):	return False
-			if isOID(item[0]):	pass
-			elif type(item[0])==type("") and item[0].lower() in self._otherLogosOIDs:	item[0] = OID(self._otherLogosOIDs[item[0].lower()])
-			else:	return False
-		for n in range(len(logoarray)):
-			self.extn['other'].append(( OID(logoarray[n][0]),logoarray[n][1] ))
+		for logo in logoarray:
+			if not self.pushCommunity(logo):	return False
+		return True
+	def Other(self, logoarray):
+		if not logoarray or type(logoarray) not in [type([]),type(tuple([]))]:	return False
+		for logo in logoarray:
+			if type(logo) not in [type([]),type(tuple([]))] or len(logo)!=2:	return False
+			if not self.pushOther(logo[0], logo[1]):	return False
+		return True
+	def pushCommunity(self, logo):
+		if not isinstance(logo,x509logotypeData):	return False
+		self.extn['community'].append(logo)
+		return True
+	def pushOther(self, logotype, logo):
+		if not (isOID(logotype) and isinstance(logo,x509logotypeData)):	return False
+		typeoid = None
+		for o in self._otherLogoOIDs.values():
+			if logotype==repr(o) or (isinstance(logotype,OID) and logotype==o):	typeoid = o;	break
+		if not typeoid:
+			for k in self._otherLogoOIDs.keys():
+				if logotype.lower()==k.lower():	typeoid = self._otherLogoOIDs[k];	break
+		if not typeoid:	return False
+		self.extn['other'].append((typeoid,logo))
 		return True
 	def popCommunity(self, index=-1):
 		return self.extn['community'].pop(index)
@@ -209,14 +247,14 @@ class x509LogotypeExtension:
 				LL.append( (self.extn['other'][m][0], L) )
 			ret[3] = LL
 		return ret
-	def exportConfig(self, filename, section="logotypeExtn", append=True):
+	def exportConfig(self, fileobj, section="logotypeExtn"):		#, append=True
 		import configparser
 		def exportLogotypeDetails(cnf, d, section):
 			#global cnf
 			_hashAlg = {
-				'sha1':OID((1,3,14,3,2,26),label="sha1"),
-				'sha256':OID((2,16,840,1,101,3,4,2,1),label="sha256"),
 				'sha512':OID((1,3,14,3,2,26),label="sha512"),
+				'sha256':OID((2,16,840,1,101,3,4,2,1),label="sha256"),
+				'sha1':OID((1,3,14,3,2,26),label="sha1"),
 				'md5':OID((1,2,840,113549,2,5),label="md5")
 			}
 			cnf.add_section(section)
@@ -241,7 +279,8 @@ class x509LogotypeExtension:
 					else:
 						for u in range(len(d[key])):
 							cnf.set(section+".URI", 'uri.%d'%u, "IA5STRING:%s"%d[key][u])
-				elif key in ['fileSize','playTime','channels']:
+				elif key=='type':	cnf.set(section, 'type', "EXPLICIT:0,INTEGER:%d"%int(d['type']))
+				elif key in ['fileSize','xSize','ySize','playTime','channels']:
 					cnf.set(section, key, "INTEGER:%d"%d[key])
 				elif key=='sampleRate':	cnf.set(section, key, "EXPLICIT:3,INTEGER:%d"%d[key])
 				elif key=='language':	cnf.set(section, key, "EXPLICIT:4,IA5STRING:%s"%d[key])
@@ -251,11 +290,12 @@ class x509LogotypeExtension:
 		issuerLogotypeImage, issuerLogotypeAudio, issuerLogotypeImageDetails, issuerLogotypeAudioDetails = [], [], [], []
 		subjectLogotypeImage, subjectLogotypeAudio, subjectLogotypeImageDetails, subjectLogotypeAudioDetails = [], [], [], []
 		otherOtherLogotypeInfo, otherLogotypeInfo, otherLogotypeData, otherLogotypeImage, otherLogotypeAudio, otherLogotypeImageDetails, otherLogotypeAudioDetails = [], [], [], [], [], [], []
-		logotypeOID = OID(1,3,6,1,5,5,7,1,12,label="logotype")
-		logotypeASN1SEQ = "ASN1:SEQUENCE:" + section
 		ext = self.struct()
 		if not ext:	return False
+		logotypeOID = OID(1,3,6,1,5,5,7,1,12,label="id-pe-logotype")
+		logotypeASN1SEQ = "ASN1:SEQUENCE:" + section
 		cnf = configparser.ConfigParser()
+		cnf.optionxform = str
 		cnf.add_section(section)
 		if 0 in ext.keys():
 			cnf.set(section, 'communityLogos', "EXPLICIT:0,SEQUENCE:communityLogos")
@@ -269,15 +309,15 @@ class x509LogotypeExtension:
 					cnf.set('community.%d.LogotypeData'%n, 'image.%d'%img, "SEQUENCE:community.%d.LogotypeImage.%d"%(n,img))
 					cnf.add_section('community.%d.LogotypeImage.%d'%(n,img))
 					cnf.set("community.%d.LogotypeImage.%d"%(n,img), 'imageDetails', "SEQUENCE:community.%d.LogotypeImage.%d.ImageDetails"%(n,img))
-					cnf.add_section('community.%d.LogotypeImage.%d.ImageDetails'%(n,img))
 					cnf = exportLogotypeDetails(cnf, ext[0][n][0][img][0], 'community.%d.LogotypeImage.%d.ImageDetails'%(n,img))
-				for aud in range(len(ext[0][n][1])):
-					cnf.set('community.%d.LogotypeData'%n, 'audio.%d'%aud, "SEQUENCE:community.%d.LogotypeAduio.%d"%(n,aud))
-					cnf.add_section('community.%d.LogotypeAudio.%d'%(n,aud))
-					cnf.set("community.%d.LogotypeAudio.%d"%(n,aud), 'audioDetails', "SEQUENCE:community.%d.LogotypeAudio.%d.AudioDetails"%(n,aud))
-					cnf = exportLogotypeDetails(cnf, ext[0][n][1][aud][0], 'community.%d.LogotypeAudio.%d.AudioDetails'%(n,aud))
-					if 1 in ext[0][n][1][aud].keys():
-						cnf = exportLogotypeDetails(cnf, ext[0][n][1][aud][1], 'community.%d.LogotypeAudio.%d.AudioInfo'%(n,aud))
+				if 1 in ext[0][n].keys():
+					for aud in range(len(ext[0][n][1])):
+						cnf.set('community.%d.LogotypeData'%n, 'audio.%d'%aud, "SEQUENCE:community.%d.LogotypeAduio.%d"%(n,aud))
+						cnf.add_section('community.%d.LogotypeAudio.%d'%(n,aud))
+						cnf.set("community.%d.LogotypeAudio.%d"%(n,aud), 'audioDetails', "SEQUENCE:community.%d.LogotypeAudio.%d.AudioDetails"%(n,aud))
+						cnf = exportLogotypeDetails(cnf, ext[0][n][1][aud][0], 'community.%d.LogotypeAudio.%d.AudioDetails'%(n,aud))
+						if 1 in ext[0][n][1][aud].keys():
+							cnf = exportLogotypeDetails(cnf, ext[0][n][1][aud][1], 'community.%d.LogotypeAudio.%d.AudioInfo'%(n,aud))
 		if 1 in ext.keys():
 			cnf.set(section, 'issuerLogo', "EXPLICIT:1,IMPLICIT:0,SEQUENCE:issuer.LogotypeInfo")
 			cnf.add_section('issuer.LogotypeInfo')
@@ -289,7 +329,6 @@ class x509LogotypeExtension:
 				cnf.set('issuer.LogotypeImage.%d'%img, 'imageDetails', "SEQUENCE:issuer.LogotypeImage.%d.ImageDetails"%img)
 				cnf = exportLogotypeDetails(cnf, ext[1][0][img][0], 'issuer.LogotypeImage.%d.ImageDetails'%img)
 			if 1 in ext[1].keys():
-				print(ext[1][1].keys())
 				for aud in range(len(ext[1][1])):
 					cnf.set('issuer.LogotypeData', 'audio.%d'%aud, "SEQUENCE:issuer.LogotypeAudio.%d"%aud)
 					cnf.add_section('issuer.LogotypeAudio.%d'%aud)
@@ -307,15 +346,16 @@ class x509LogotypeExtension:
 				cnf.add_section('subject.LogotypeImage.%d'%img)
 				cnf.set('subject.LogotypeImage.%d'%img, 'imageDetails', "SEQUENCE:subject.LogotypeImage.%d.ImageDetails"%img)
 				cnf = exportLogotypeDetails(cnf, ext[2][0][img][0], 'subject.LogotypeImage.%d.ImageDetails'%img)
-			for aud in range(len(ext[2][1])):
-				cnf.set('subject.LogotypeData', 'audio.%d'%aud, "SEQUENCE:subject.LogotypeAudio.%d"%aud)
-				cnf.add_section('issuer.LogotypeAudio.%d'%aud)
-				cnf.set('subject.LogotypeAudio.%d'%aud, 'audioDetails', "SEQUENCE:subject.LogotypeImage.%d.AudioDetails"%aud)
-				cnf = exportLogotypeDetails(cnf, ext[2][1][aud][0], 'subject.LogotypeImage.%d.AudioDetails'%aud)
-				if 1 in ext[2][1][aud].keys():
-					cnf = exportLogotypeDetails(cnf, ext[2][1][aud][1], 'subject.LogotypeAudio.%d.AudioInfo'%aud)
+			if 1 in ext[2].keys():
+				for aud in range(len(ext[2][1])):
+					cnf.set('subject.LogotypeData', 'audio.%d'%aud, "SEQUENCE:subject.LogotypeAudio.%d"%aud)
+					cnf.add_section('issuer.LogotypeAudio.%d'%aud)
+					cnf.set('subject.LogotypeAudio.%d'%aud, 'audioDetails', "SEQUENCE:subject.LogotypeImage.%d.AudioDetails"%aud)
+					cnf = exportLogotypeDetails(cnf, ext[2][1][aud][0], 'subject.LogotypeImage.%d.AudioDetails'%aud)
+					if 1 in ext[2][1][aud].keys():
+						cnf = exportLogotypeDetails(cnf, ext[2][1][aud][1], 'subject.LogotypeAudio.%d.AudioInfo'%aud)
 		if 3 in ext.keys():
-			cnf.set(section, 'communityLogos', "EXPLICIT:3,SEQUENCE:otherLogos")
+			cnf.set(section, 'otherLogos', "EXPLICIT:3,SEQUENCE:otherLogos")
 			cnf.add_section('otherLogos')
 			for n in range(len(ext[3])):
 				cnf.set('otherLogos', "other.%d"%n, "IMPLICIT:0,SEQUENCE:other.%d.OtherLogotypeInfo"%n)
@@ -323,33 +363,36 @@ class x509LogotypeExtension:
 				cnf.set('other.%d.OtherLogotypeInfo'%n, 'logotypeType', "OID:%s"%repr(ext[3][n][0]))
 				cnf.set('other.%d.OtherLogotypeInfo'%n, 'info', "IMPLICIT:0,SEQUENCE:other.%d.LogotypeInfo"%n)
 				cnf.add_section('other.%d.LogotypeInfo'%n)
-				cns.set('other.%d.LogotypeInfo'%n, 'direct', "SEQUENCE:other.%d.LogotypeData"%n)
+				cnf.set('other.%d.LogotypeInfo'%n, 'direct', "SEQUENCE:other.%d.LogotypeData"%n)
 				cnf.add_section('other.%d.LogotypeData'%n)
 				for img in range(len(ext[3][n][1][0])):
-					cnf.set('other.%d.LogotypeData'%n, 'image.%d'%img, "SEQUENCE:community.%d.LogotypeImage.%d"%(n,img))
-					cnf.add_section('community.%d.LogotypeImage.%d'%(n,img))
-					cnf.set('community.%d.LogotypeImage.%d'%(n,img), 'imageDetails', "SEQUENCE:community.%d.LogotypeImage.%d.ImageDetails"%(n,img))
-					cnf = exportLogotypeDetails(cnf, ext[3][n][1][0][img][0], 'community.%d.LogotypeImage.%d.ImageDetails'%(n,img))
-				for aud in range(len(ext[3][n][1][1])):
-					cnf.set('other.%d.LogotypeData'%n, 'audio.%d'%aud, "SEQUENCE:community.%d.LogotypeAudio.%d"%(n,aud))
-					cnf.add_section('community.%d.LogotypeAudio.%d'%(n,aud))
-					cnf.set('community.%d.LogotypeAudio.%d'%(n,aud), 'audioDetails', "SEQUENCE:community.%d.LogotypeAudio.%d.AudioDetails"%(n,aud))
-					cnf = exportLogotypeDetails(cnf, ext[3][n][1][1][aud][0], 'community.%d.LogotypeAudio.%d.AudioDetails'%(n,aud))
-					if 1 in ext[3][n][1][1][aud].keys():
-						cnf = exportLogotypeDetails(cnf, ext[3][n][1][1][aud][1], 'other.%d.LogotypeAudio.%d.AudioInfo'%(n,aud))
-		if append:	openstring = 'a'
-		else:	openstring = 'w'
-		with open(filename,openstring) as CNFfile:
-			try:	cnf.write(CNFfile, space_around_delimiters=True)
-			except:	return False
+					cnf.set('other.%d.LogotypeData'%n, 'image.%d'%img, "SEQUENCE:other.%d.LogotypeImage.%d"%(n,img))
+					cnf.add_section('other.%d.LogotypeImage.%d'%(n,img))
+					cnf.set('other.%d.LogotypeImage.%d'%(n,img), 'imageDetails', "SEQUENCE:other.%d.LogotypeImage.%d.ImageDetails"%(n,img))
+					cnf = exportLogotypeDetails(cnf, ext[3][n][1][0][img][0], 'other.%d.LogotypeImage.%d.ImageDetails'%(n,img))
+				if 1 in ext[3][n][1].keys():
+					for aud in range(len(ext[3][n][1][1])):
+						cnf.set('other.%d.LogotypeData'%n, 'audio.%d'%aud, "SEQUENCE:other.%d.LogotypeAudio.%d"%(n,aud))
+						cnf.add_section('other.%d.LogotypeAudio.%d'%(n,aud))
+						cnf.set('other.%d.LogotypeAudio.%d'%(n,aud), 'audioDetails', "SEQUENCE:other.%d.LogotypeAudio.%d.AudioDetails"%(n,aud))
+						cnf = exportLogotypeDetails(cnf, ext[3][n][1][1][aud][0], 'other.%d.LogotypeAudio.%d.AudioDetails'%(n,aud))
+						if 1 in ext[3][n][1][1][aud].keys():
+							cnf = exportLogotypeDetails(cnf, ext[3][n][1][1][aud][1], 'other.%d.LogotypeAudio.%d.AudioInfo'%(n,aud))
+		#if append:	openstring = 'a'
+		#else:	openstring = 'w'
+		#with open(filename,openstring) as CNFfile:
+		#	try:	cnf.write(CNFfile, space_around_delimiters=True)
+		#	except:	return False
+		try:	cnf.write(fileobj, space_around_delimiters=True)
+		except:	return False
 		return "%s\t=\t%s"%(repr(logotypeOID), logotypeASN1SEQ)
 class x509logotypeData:
-	def __init__(self, imagefile, imgformat=None, indirect=False, width=0,height=0,duration=None, language=None, channels=0, samplerate=0, hashtype="sha1"):
+	def __init__(self, imagefile, imgformat=None, indirect=False, width=0,height=0,duration=None, language=None, channels=0, samplerate=0, hashtype="sha256"):
 		#self.logos, self.isimage, self.isaudio = [], [], []
 		self.logos = []
 		if imagefile:
 			self.add(imagefile,imgformat,indirect,width,height,duration, language, channels, samplerate,hashtype)
-	def add(self, imagefile, imgformat=None, indirect=False, width=0,height=0,duration=None, language=None, channels=0, samplerate=0, hashtype="sha1"):
+	def add(self, imagefile, imgformat=None, indirect=False, width=0,height=0,duration=None, language=None, channels=0, samplerate=0, hashtype="sha256"):
 		self.logos.append( _x509logotypeDetails(imagefile,imgformat,indirect,width,height,duration,language,channels,samplerate,hashtype) )
 #		try:	self.logos.append( _x509logotypeDetails(imagefile,imformat,indirect,width,height,duration,language,channels,samplerate,hashtype) )
 #		except:	return False
@@ -368,7 +411,7 @@ class x509logotypeData:
 	def isaudio(self,num):	return self.logos[num].isaudio()
 	def isdirect(self,num):	return self.logos[num].direct
 	def mediaType(self,num):	return self.logos[num].mediaType
-	def digest(self,num,hash=None):
+	def digest(self,num=None,hash=None):
 		if num not in range(self.len()):	return False
 		if not hash:	return self.logos[num].digest
 		if hash not in self.logos[num].digest.keys():	return False
@@ -378,8 +421,6 @@ class x509logotypeData:
 		elif self.isaudio(num):	return self.logos[num].filesize
 		else:	return False
 	def URI(self,num):	return self.logos[n].URI
-#	def digest(self,num,hashtype="sha1"):
-#		if 
 class _x509logotypeDetails:
 	_mime = {
 		'GIF'	: "image/gif",
@@ -387,19 +428,20 @@ class _x509logotypeDetails:
 		'JPEG'	: "image/jpeg",
 		'PNG'	: "image/png",
 		'SVG'	: "image/svg+xml",
-		'SVGZ'	: "image/svg+xml",
+		'SVGZ'	: "image/svg+xml+gzip",
 		'MP3'	: "audio/mpeg",
 		'PDF'	: "application/pdf"
 	}
 	_hashAlg = {
-		'sha1':OID((1,3,14,3,2,26),label="sha1"),
-		'sha256':OID((2,16,840,1,101,3,4,2,1),label="sha256"),
 		'sha512':OID((1,3,14,3,2,26),label="sha512"),
+		'sha256':OID((2,16,840,1,101,3,4,2,1),label="sha256"),
+		'sha1':OID((1,3,14,3,2,26),label="sha1"),
 		'md5':OID((1,2,840,113549,2,5),label="md5")
 	}
-	def __init__(self, imagefile=None, imgformat=None, indirect=False, width=0,height=0, duration=None,language=None,channels=0,samplerate=0, hashtype="sha1"):
+	def __init__(self, imagefile=None, imgformat=None, indirect=False, width=0,height=0, duration=None,language=None,channels=0,samplerate=0, hashtype="sha256"):
 		"""Instantiates the class and optionally addsa document as logotype in the queue. Supported formats are GIF, JPEG, PNG, SVG (and SVGZ), PDF and MP3."""
 #	def __init__(self):
+		import hashlib
 		self.payload, self.direct, self.filesize, self.width, self.height, self.URI, self.playtime, self.lang, self.chN, self.rate, self.digest = None,None, 0, None, None, None, None, None, 0, 0, {}
 		self.hashAlg = []
 #	def addLogo(self, imagefile=None, imgformat=None, indirect=False, width=0,height=0, duration=None,language=None,channels=0,samplerate=0, hash="sha256"):
@@ -433,7 +475,7 @@ class _x509logotypeDetails:
 					self.hashAlg.append(s.lower())
 				else:	raise WrongArguments
 		else:	raise WrongArguments
-		if "sha1" not in self.hashAlg:	self.hashAlg.append("sha1")
+		#if "sha1" not in self.hashAlg:	self.hashAlg.append("sha1")	## Removed this line as SHA-1 is deprecated and it is not any longer mandatory in logotype as of RFC-9399.
 		if type(imgformat)!=type("") or imgformat.upper() not in self._mime.keys():	raise UnsupportedDeclaredFileFormatOrMIMEType
 		else:	self.mediaType = self._mime[imgformat.upper()]
 		if imgformat.upper()=="MP3":		## The only audio-logotype supported format
@@ -446,20 +488,20 @@ class _x509logotypeDetails:
 		if imgformat.upper()!="MP3":
 			if language==None or (type(language)==type("") and re.match(r"[A-Za-z0-9]{1,8}(\-[A-Za-z0-9]{1,8})?",language)):	self.language = language
 			else:	raise UnsupportedLanguage
-		if imgformat.upper()=="SVG":
-			import mmap
-			with open(imagefile,'r') as file:
-				_svg = mmap.mmap(file.fileno(),0,access=mmap.ACCESS_READ)
-				if _svg.find("<script")!=-1:	raise UnsupportedDeclaredFileFormatOrMIMEType
-				_svg.close()
-			####	Potentially add SVG Tiny 1.2 parser that also checks lack of external references
-		if imgformat.upper()=="SVG":
+		if imgformat.upper() in ["SVG","SVGZ"]:
 			import tempfile
 			import gzip
-			import lxml
-			#import zipfile
 			try:	tmp = tempfile.TemporaryFile()
 			except:	raise TemporaryFileWriteError
+		if imgformat.upper()=="SVG":
+			import mmap
+			import lxml
+			#with open(imagefile,'r') as file:
+			#	_svg = mmap.mmap(file.fileno(),0,access=mmap.ACCESS_READ)
+			#	if _svg.find("<script")!=-1:	raise UnsupportedDeclaredFileFormatOrMIMEType
+			#	_svg.close()
+			####	Potentially add SVG Tiny 1.2 parser that also checks lack of external references
+			#import zipfile
 			c14n = io.StringIO.StringIO()
 			imagebuf = open(imagefile,'rb')
 			_svg = mmap.mmap(imagebuf.fileno(),0,access=mmap.ACCESS_READ)
@@ -484,22 +526,15 @@ class _x509logotypeDetails:
 			#imagebuf.seek(0)
 			self.payload = base64.b64encode(imagebuf.getbuffer())
 		elif imgformat.upper()=="SVGZ":
-			import gzip
-			import lxml
-			if not self._isGZIPfile(open(imagefile,'rb').read(10).decode()):	raise UnsupportedActualVsDeclaredFileFormat
-			with gzip.open(imagefile,'rb') as gz:	imagebuf = gz.read()
-			c14n = io.StringIO.StringIO()
-			try:	
-				_et = lxml.etree.parse(imagebuf)
-				_et.write_c14n(c14n)
+			import xml.etree.ElementTree as xml
+			if not self._isGZIPfile(open(imagefile,'rb').read(10)):	raise UnsupportedActualVsDeclaredFileFormat
+			try:
+				imagebuf = gzip.open(imagefile,'rb').read()
+				c14n = xml.canonicalize(imagebuf)
 			except:	raise UnsupportedDeclaredFileFormatOrMIMEType
-			self.payload = base64.b64encode(c14n.read())
+			tmp = c14n.encode()
+			self.payload = base64.b64encode(tmp)	#.read()
 			del c14n
-		elif imgformat.upper()=="SVG+ZIP":
-			imagebuf = open(imagefile,'rb')
-			if not self._isZIPfile(imagebuf.read(32).decode()):	raise UnsupportedActualVsDeclaredFileFormat
-			imagebuf.seek(0)
-			self.payload = base64.b64encode(imagebuf.read()).decode()
 		else:
 			imagebuf = open(imagefile,'rb')
 			imgheader = imagebuf.read(128)
@@ -509,19 +544,20 @@ class _x509logotypeDetails:
 			imagebuf.seek(0)
 		if imgformat.upper()!="SVGZ":	imagebuf.seek(0)
 		for algtype in self.hashAlg:
+			if algtype=="sha512":	blkhash = hashlib.sha512()
 			if algtype=="sha256":	blkhash = hashlib.sha256()
-			elif algtype=="sha512":	blkhash = hashlib.sha512()
 			elif algtype=="sha1":	blkhash = hashlib.sha1()
 			elif algtype=="md5":	blkhash = hashlib.md5()
 			else:	raise UnsupportedHashingAlgorithm
 			if imgformat.upper()=="SVGZ":
-				blkhash.update(tmp.read())
-				tmp.seek(0)
+				blkhash.update(tmp)
+				#tmp.seek(0)
 			else:	blkhash.update(imagebuf.read())
 			self.digest[ self._hashAlg[algtype] ] = blkhash.hexdigest()
 			del blkhash
-		if imgformat.upper()=="SVGZ":	tmp.close()
-		imagebuf.close()
+		if imgformat.upper()=="SVGZ":	del tmp	# tmp.close()
+		del imagebuf	#imagebuf.close()
+		if type(self.payload)!=type(""):	self.payload = str(self.payload)
 		if self.direct and not self.URI:
 			self.URI = "data:" + self.mediaType + ";base64," + self.payload
 	def isimage(self):	return self.mediaType.startswith("image/") or self.mediaType=="application/pdf"
@@ -600,13 +636,9 @@ class _x509logotypeDetails:
 			if self.mediaType=="audio/mpeg":	return _isMP3file(payload)
 			else:	return False
 		return False
-	def _isGZIPfile(payload):
+	def _isGZIPfile(self, payload):
 		"""Tests whether a payload begins with a valid gzip file's magic number."""
-		if len(payload)<10 or payload[0:2]!=b"\x1F\x8B" or payload[2]!=b'\x08':	return False
-		return True
-	def _isZIPfile(payload):
-		"""Tests whether a payload begins with a valid ZIP file's magic number."""
-		if len(payload)<32 or payload[0:2]!=b"PK" or payload[2:4] not in [b"\x03\x04"]:	return False
+		if len(payload)<10 or payload[0:3]!=b"\x1F\x8B\x08":	return False
 		return True
 
 
@@ -630,25 +662,5 @@ class UnsupportedLanguage(UnsupportedMetadata):	pass	# USED
 class UnsupportedPictureMetadata(UnsupportedMetadata):	pass	# USED
 class UnsupportedAudioMetadata(UnsupportedMetadata):	pass	# USED
 class TemporaryFileWriteError(Exception):	pass	# USED
-
-
-def importOIDs(filename, db=None):
-	if not db or type(db)!=type({}):	db = {}
-	labelre = re.compile(r"[a-zA-Z][a-z_A-Z0-9]*[a-zA-Z0-9]",flags=re.ASCII)
-	oidre = re.compile(r"(?P<arc>\d+)|(\$\{(?P<arc>[a-zA-Z][a-z_A-Z0-9]*[a-zA-Z0-9])\})",flags=re.ASCII)
-	lines = open(filename,'r').readlines()
-	lines = [lines[n].strip().split() for n in range(len(lines)) if lines[n].strip() and not lines[n].strip().startswith('#')]
-	for n in range(len(lines)):
-		if len(lines[n])!=3 or lines[n][1]!='=' or not labelre.match(lines[n][0]):
-			print("Invalid line start for OID #%d"%n)
-			return False
-		bites = map(oidre.match, lines[n][2].split('.'))
-		if None in bites:
-			print("Invalid OID on line #%d"%n)
-			return False
-		db[lines[n][0]] = list(map(oidre.match, lines[n][2].split('.')))
-	print(db)
-	return db
-
 
 if __name__ == "__main__": main()
