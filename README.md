@@ -37,7 +37,7 @@ The first argument to pass is the pathname an OpenSSL-valid configuration file (
 ```
 
 ### Examples
-Certiicate logotypes for the seven applications above may be generated using `pyCertLogo` using the following suggested commands:
+Certificate logotypes for the seven applications above may be generated using `pyCertLogo` using the following suggested commands:
   1. Electronic trust service provider (eTSP) issuing e-signing certificate with the eTSP's own logo as Issuer logotyoe (`-i`/`--issuer`) and a raster image representing the signer's handwritten signature (e.g. a monochromatic transparent PNG) as the Subject logotype (`-s`/`--subject`). A Qualified trust service provider (QTSP) may add the [eIDAS trust mark](https://digital-strategy.ec.europa.eu/en/policies/eu-trust-mark), pursuant to [CIR (EU) 2015/806](http://eur-lex.europa.eu/legal-content/EN/TXT/?qid=1441782918257&uri=CELEX:32015R0806), as another logotype  (`-O` *and* `-o`) associated to a reserved OID by the European Commission.
   2. eTSP issuing e-sealing certificate with the eTSP's own logo as Issuer logotyoe (`-i`) and a raster image representing the seal-creator organization's logo as the Subject logotype (`-s`). Optionally, a QTSP may add the [eIDAS trust mark](https://digital-strategy.ec.europa.eu/en/policies/eu-trust-mark) as another logotype  (`-O`+`-o`) associated to the aforementioned reserved OID.
   3. Authority governing an ID/eID means issues an IdV certificate using the Authority's own logo as Issuer logotype (`-i`), the eID subject's photograph as Subject logotype (`-s`) and, optionally, either the ICAO logo *and* the organization manufacturing the smartcard's logo as community logos (multiple `-c`/`--community`).
