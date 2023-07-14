@@ -49,7 +49,7 @@ Certiicate logotypes for the seven applications above may be generated using `py
 
 ### Implementation details
 Logotypes may be “directly” embedded in the X.509 certificate which considerably increases their payload size, up to some very resource-constrained applications/hardware failing to process the certificate, despite the Logotype extension (OID `1.3.6.1.5.5.7.20`) is *non*-critical.
-Alternatively, logos may be “indirectly” referenced from the certificate: each logotype is an externally provided content (e.g. uploaded on a CDN) and the certificate contains both that content's URI. In this case the certificate payload is not significantly increased, but at the expenses of the issuing CA, which should provide for the logotype(s)' online availability.
+Alternatively, logos may be “indirectly” referenced from the certificate: each logotype is an externally provided content (e.g. uploaded on a CDN) and the certificate just contains a URI to that. In this case the certificate payload is not significantly increased, but at the expenses of the issuing CA, which should provide for the logotype(s)' online availability.
 Hashing of the logotypes is mandatory (both for direct and indirect ones), but their trust function is relevant only in the indirect referencing. At least a SHA-256 digest should be used for each indirectly-referenced logotypes, whereas SHA-1 *may* be used for directly embedded ones.
 Therefore, direct embedding should be evalued for small raster logos (no bigger than 200×150 pixels) or very "simple" vector logos (SVG/PDF).
 
