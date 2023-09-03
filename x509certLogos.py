@@ -1,6 +1,6 @@
 #!/usr/bin/python
 ##########################################################
-#  x509certLogos  0.2                                    #
+#  x509certLogos  0.31                                    #
 #                                                        #
 #    conforms with:                                      #
 #         RFC-9399: Logotypes in X.509 Certificates      #
@@ -11,7 +11,7 @@
 #    Copyright (C) 2023 Walter Arrighetti, Ph.D.         #
 #    All Rights Reserved.                                #
 ##########################################################
-VERSION = "0.3"
+VERSION = "0.31"
 ## This version of the tool does NOT yet check whether:
 ##   * SVG/SVGZ logos conform with W3C's SVG Tiny 1.2 specs
 ##   * PNG logos conform with ISO-15948 specs
@@ -252,10 +252,18 @@ class x509LogotypeExtension:
 		def exportLogotypeDetails(cnf, d, section):
 			#global cnf
 			_hashAlg = {
-				'sha512':OID((1,3,14,3,2,26),label="sha512"),
-				'sha256':OID((2,16,840,1,101,3,4,2,1),label="sha256"),
-				'sha1':OID((1,3,14,3,2,26),label="sha1"),
-				'md5':OID((1,2,840,113549,2,5),label="md5")
+				'sha3-512':OID((2,16,840,1,101,3,4,2,10,10),label="sha3-512"),
+				'sha3-384':OID((2,16,840,1,101,3,4,2,10,9),label="sha3-384"),
+				'sha3-256':OID((2,16,840,1,101,3,4,2,10,8),label="sha3-256"),
+				'sha3-224':OID((2,16,840,1,101,3,4,2,10,7),label="sha3-224"),
+				'sha512'  :OID((2,16,840,1,101,3,4,2,10,3),label="sha512"),
+				'sha384'  :OID((2,16,840,1,101,3,4,2,10,2),label="sha384"),
+				'sha256'  :OID((2,16,840,1,101,3,4,2,10,1),label="sha256"),
+				'sha224'  :OID((2,16,840,1,101,3,4,2,10,4),label="sha224"),
+				'sha1'    :OID((1,3,14,3,2,26),label="sha1"),
+				'shake256':OID((2,16,840,1,101,3,4,2,10,12),label="shake256"),
+				'shake128':OID((2,16,840,1,101,3,4,2,10,11),label="shake128"),
+				'md5'     :OID((1,2,840,113549,2,5),label="md5")
 			}
 			cnf.add_section(section)
 			for key in d.keys():
@@ -433,10 +441,18 @@ class _x509logotypeDetails:
 		'PDF'	: "application/pdf"
 	}
 	_hashAlg = {
-		'sha512':OID((1,3,14,3,2,26),label="sha512"),
-		'sha256':OID((2,16,840,1,101,3,4,2,1),label="sha256"),
-		'sha1':OID((1,3,14,3,2,26),label="sha1"),
-		'md5':OID((1,2,840,113549,2,5),label="md5")
+		'sha3-512':OID((2,16,840,1,101,3,4,2,10,10),label="sha3-512"),
+		'sha3-384':OID((2,16,840,1,101,3,4,2,10,9),label="sha3-384"),
+		'sha3-256':OID((2,16,840,1,101,3,4,2,10,8),label="sha3-256"),
+		'sha3-224':OID((2,16,840,1,101,3,4,2,10,7),label="sha3-224"),
+		'sha512'  :OID((2,16,840,1,101,3,4,2,10,3),label="sha512"),
+		'sha384'  :OID((2,16,840,1,101,3,4,2,10,2),label="sha384"),
+		'sha256'  :OID((2,16,840,1,101,3,4,2,10,1),label="sha256"),
+		'sha224'  :OID((2,16,840,1,101,3,4,2,10,4),label="sha224"),
+		'sha1'    :OID((1,3,14,3,2,26),label="sha1"),
+		'shake256':OID((2,16,840,1,101,3,4,2,10,12),label="shake256"),
+		'shake128':OID((2,16,840,1,101,3,4,2,10,11),label="shake128"),
+		'md5'     :OID((1,2,840,113549,2,5),label="md5")
 	}
 	def __init__(self, imagefile=None, imgformat=None, indirect=False, width=0,height=0, duration=None,language=None,channels=0,samplerate=0, hashtype="sha256"):
 		"""Instantiates the class and optionally addsa document as logotype in the queue. Supported formats are GIF, JPEG, PNG, SVG (and SVGZ), PDF and MP3."""
